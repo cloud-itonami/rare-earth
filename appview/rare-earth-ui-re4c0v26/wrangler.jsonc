@@ -1,10 +1,10 @@
 {
   "name": "rare-earth-ui-re4c0v26",
-  "main": "svelte/.svelte-kit/cloudflare/_worker.js",
+  "main": "./appview/rare-earth-ui-re4c0v26/src/app.ts",
   "compatibility_date": "2025-03-17",
   "compatibility_flags": ["nodejs_compat", "nodejs_als"],
   "assets": {
-    "directory": "./svelte/.svelte-kit/cloudflare/client",
+    "directory": "./web/dist",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "single-page-application"

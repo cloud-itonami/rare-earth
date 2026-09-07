@@ -1,0 +1,14 @@
+{:paths ["src"]
+ ;; Frontend deps (shadow-cljs :cljs alias). appkit transitively pulls
+ ;; kotoba-ui → liquid-glass-ui → shitsuke — same convention as
+ ;; orgs/kotoba-lang/murakumo-studio/deps.edn. local/root path is relative
+ ;; to this repo's checkout location (worktrees live in orgs/_wt-*):
+ ;; orgs/_wt-public-malak → ../../kotoba-lang/appkit resolves through the
+ ;; ~/github/kotoba-lang/appkit symlink farm to the west checkout
+ ;; orgs/kotoba-lang/appkit. (The old orgs/<org>/_wt-* layout used
+ ;; ../../../../ — see yuubin #1.)
+ :aliases
+ {:cljs
+  {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.20"}
+                reagent/reagent {:mvn/version "1.2.0"}
+                io.github.kotoba-lang/appkit {:local/root "../../kotoba-lang/appkit"}}}}}

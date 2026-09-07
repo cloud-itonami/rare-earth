@@ -1,0 +1,12 @@
+{
+  "name": "rare-earth",
+  "version": "1.0.0",
+  "description": "Rare Earth Coverage (rare-earth-ui-re4c0v26) — mineral/actor DID registry appview UI (shadow-cljs + reagent + kotoba-ui)",
+  "main": "index.js",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
