@@ -1,12 +1,11 @@
 # Operator quickstart
 
-**A complete API worker you can run in one command, and the fact that deploying
-this repository does not serve it.** The deployed page fetches four endpoints that
-the deployed worker does not have, with no error handling, so it renders
-`Loading rare earth coverage...` and stops there.
-
-Steps marked ✅ were run against this tree on 2026-08-15. The ⚠ items were
-measured.
+**A complete API worker and a shadow-cljs/reagent front-end that now talk to each
+other.** Until 2026-09-07 the deployed page fetched four endpoints that the
+deployed worker did not have (the SvelteKit build bundled no API routes), with no
+error handling, so it rendered `Loading rare earth coverage...` and stopped
+there. §2 of this document recorded that gap; the svelte→cljs migration closed
+it. Steps marked ✅ were run against this tree. The ⚠ items were measured.
 
 ---
 
@@ -67,111 +66,60 @@ grep -oE "url\.pathname === '[^']+'" src/app.ts | sed "s/.*=== //"
 This is the most complete thing in the repository, and it is worth knowing it works,
 because it is what you develop against.
 
-## 2. ⚠ It is not what deploys, and the page never finishes loading
+## 2. ✅ What used to be broken, and what closed it (2026-09-07)
 
-`wrangler.jsonc` sets `main` to `svelte/.svelte-kit/cloudflare/_worker.js`.
-Measured: there is **no `+server.ts` or `+page.server.ts` anywhere under
-`svelte/src/`**, so the deployed worker serves no `/api/*` and no `/xrpc/*` at all.
-And `assets.not_found_handling` is `single-page-application`, so those paths return
-the SPA shell — HTML — rather than 404.
+`wrangler.jsonc` used to set `main` to `svelte/.svelte-kit/cloudflare/_worker.js`.
+Measured then: there was **no `+server.ts` or `+page.server.ts` anywhere under
+`svelte/src/`**, so the deployed worker served no `/api/*` and no `/xrpc/*` at
+all, while `svelte/src/App.svelte` fetched exactly those four endpoints with zero
+`.catch` handlers. The page therefore showed "Loading rare earth coverage..."
+indefinitely in production.
 
-Meanwhile `svelte/src/App.svelte` makes exactly four fetches and **zero** `.catch`
-handlers:
-
-```
-fetch('/xrpc/com.etzhayyim.apps.rareEarth.coverage.listActors')
-fetch('/xrpc/com.etzhayyim.apps.rareEarth.coverage.listFlows')
-fetch('/api/rare-earth/coverage')
-fetch('/api/rare-earth/shinka')
-```
-
-Every one is a route only `src/app.ts` serves. `res.json()` on the SPA shell
-rejects, nothing catches it, `data` is never assigned, and the template's guard is
-`{#if data} … {:else}`, whose else branch is:
-
-```svelte
-<main class="loading">Loading rare earth coverage...</main>
-```
-
-**So the deployed site shows "Loading rare earth coverage..." indefinitely** — not
-an error page, not a blank one. That is the symptom to expect, and it does not
-distinguish "the API is down" from "the API was never deployed".
-
-Verify the two halves yourself:
-
-```bash
-grep '"main"' wrangler.jsonc
-find svelte/src -name '+server.ts' -o -name '+page.server.ts'   # no output
-grep -c '\.catch(' svelte/src/App.svelte                        # 0
-```
+The migration replaced the SvelteKit front-end with a shadow-cljs + reagent app
+(`src/cloud_itonami/rare_earth/`) that fetches the same four endpoints **and
+handles failure**: `state.cljs`'s `load!` guards every response status and routes
+rejections into the state atom, and `ui.cljs` renders an explicit
+"Failed to load rare earth coverage: …" panel instead of hanging on the loading
+branch. `wrangler.jsonc` now points `main` at `./appview/rare-earth-ui-re4c0v26/src/app.ts`
+(the real API worker) and serves the compiled UI from `./web/dist`.
 
 This repository is also in the fleet-wide facade measurement — of the 329 appview
 repositories carrying a `wrangler.jsonc`, 89 serve `/health` only in an undeployed
 facade. The standing check is `:verify-appview-facade` in
-`manifest/orgs-detectors.edn`. What is specific here is that the undeployed file is
-not just a health endpoint: it is the entire data API the page depends on.
+`manifest/orgs-detectors.edn`. What was specific here is that the undeployed file
+was not just a health endpoint: it was the entire data API the page depends on —
+now deployed and now wired up.
 
-## 3. ⚠ Two copies of the coverage data, disagreeing on 7 of 9 keys
+## 3. ✅ Two copies of the coverage data — one is gone
 
-`src/coverage-data.ts` and `svelte/static/rare-earth/coverage.json` hold the same
-shape. Measured:
+`src/coverage-data.ts` and `svelte/static/rare-earth/coverage.json` held the same
+shape but disagreed on 7 of 9 keys (measured 2026-08-15): 43 vs 20 actors, 43 vs
+18 flows, minerals key absent from the JSON, different bottleneck text, `updatedAt`
+85 minutes apart. The JSON copy was published at `/rare-earth/coverage.json`, a
+path nothing requested.
 
-| key | `coverage-data.ts` | `static/…/coverage.json` |
-|---|---|---|
-| `actors` | **43** | 20 |
-| `flows` | **43** | 18 |
-| `minerals` | 6 | **key absent** |
-| `stageCoverage` | 7 | 6 |
-| `metrics` | 5 keys | 4 keys |
-| `bottlenecks` | 3 | 3, different content |
-| `updatedAt` | `2026-04-13T19:10:00Z` | `2026-04-13T17:45:00Z` |
-| `appviewDid`, `primaryActorDid` | identical | identical |
+The migration deleted the `svelte/` directory, so the stale JSON copy is gone and
+`src/coverage-data.ts` is the single source of truth. The CLJS UI reads data only
+through the worker's API routes — the same routes §1 walks.
 
-Same day, **85 minutes apart**, and the older copy is missing an entire category.
+## 4. Build the UI ✅
 
-Which one ships is the opposite of which one is current: the TypeScript copy is
-fresher and reaches the browser only through the worker that is not deployed, while
-the JSON copy is under SvelteKit's `static/`, so it IS published — at
-`/rare-earth/coverage.json`, a path **nothing in this repository requests**.
-
-Reproduce with the comparison used above:
+The front-end is shadow-cljs (CLJS + reagent on kotoba-ui.core + appkit.core,
+murakumo-studio構成 — same as public-malak / app-itonami / yuubin). From the repo
+root:
 
 ```bash
-cat > /tmp/recmp.mjs <<'EOF'
-import { readFileSync } from "node:fs";
-const ts = (await import(process.argv[2])).coverageData;
-const json = JSON.parse(readFileSync(process.argv[3], "utf8"));
-for (const k of [...new Set([...Object.keys(ts), ...Object.keys(json)])].sort()) {
-  const size = (v) => Array.isArray(v) ? `[${v.length}]`
-    : (v && typeof v === "object" ? `{${Object.keys(v).length}}` : JSON.stringify(v));
-  console.log(JSON.stringify(ts[k]) === JSON.stringify(json[k]) ? "same" : "DIFF",
-              k, "ts=" + size(ts[k]), "json=" + size(json[k]));
-}
-EOF
-node --experimental-strip-types /tmp/recmp.mjs \
-  "$PWD/src/coverage-data.ts" "$PWD/svelte/static/rare-earth/coverage.json"
+npm install                                  # react / react-dom for the shadow-cljs npm provider
+clojure -M:cljs -m shadow.cljs.devtools.cli compile app
 ```
 
-## 4. Build ⚠ NOT WALKED
+Verified on 2026-09-07: `[:app] Build completed. (95 files, 94 compiled, 0
+warnings)` and the compiled `web/dist/` served through a stub-API http server in
+Chrome renders every panel (hero, metrics, stage coverage, bottlenecks, heartbeat,
+minerals, priority actors, flows), the stage filter narrows the actor list, and a
+failing endpoint shows the error panel instead of hanging.
 
-`svelte/package-lock.json` **exists**, so an install here is reproducible and
-`npm ci` is available rather than a fresh resolve. That is not unusual in this
-cohort — measured, 70 of the 329 appview repositories carrying a `wrangler.jsonc`
-track a lockfile. (An earlier draft of this file called it the first one; that was
-a superlative I had not measured, and it was wrong.) It still needs the network,
-and `node_modules` is absent, so the build was not run while writing this and is
-not claimed to work. Go through the repo-wide resource
-governor rather than invoking it directly:
-
-```bash
-node <root>/scripts/resource-guard.mjs run build -- \
-  npm --prefix appview/rare-earth-ui-re4c0v26/svelte ci
-node <root>/scripts/resource-guard.mjs run build -- \
-  npm --prefix appview/rare-earth-ui-re4c0v26/svelte run build
-```
-
-Building will not fix §2. The build produces the SvelteKit worker, and the API
-routes the page needs are not in it.
+The committed `web/dist/` is that build's output; rebuilding regenerates it.
 
 ---
 
