@@ -7,7 +7,7 @@
   CSS ported verbatim, mirroring cloud-itonami.public-malak.ui /
   cloud-itonami.app-itonami.ui."
   (:require [appkit.core :as shape]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [cloud-itonami.rare-earth.state :as state]))
 
 (def css-text
