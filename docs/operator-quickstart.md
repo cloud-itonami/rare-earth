@@ -110,7 +110,7 @@ root:
 
 ```bash
 npm install                                  # react / react-dom for the shadow-cljs npm provider
-clojure -M:cljs -m shadow.cljs.devtools.cli compile app
+kbb -M:cljs -m shadow.cljs.devtools.cli compile app
 ```
 
 Verified on 2026-09-07: `[:app] Build completed. (95 files, 94 compiled, 0
