@@ -125,7 +125,7 @@ The committed `web/dist/` is that build's output; rebuilding regenerates it.
 
 ## 5. Identity
 
-There is no `CLAUDE.md` here; `appview/README.md` carries the identity:
+There is no `AGENTS.md` here; `appview/README.md` carries the identity:
 
 | | |
 |---|---|
